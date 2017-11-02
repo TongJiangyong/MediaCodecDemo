@@ -12,7 +12,13 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="播放器测试" />
-
+    <CheckBox
+        android:id="@+id/cb"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:checked="false"
+        android:text="异步模式"
+        ></CheckBox>
     <Button
         android:id="@+id/button"
         android:layout_width="wrap_content"

@@ -10,6 +10,8 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,6 +22,7 @@ import java.lang.reflect.Method;
 
 import yong.mediacodecdemo.IvideoCallBack.IvideoStatusCallBack;
 import yong.mediacodecdemo.MediaCodecASync.MediaCodecASync;
+import yong.mediacodecdemo.MediaCodecSync.MediaCodecSync;
 
 //暂时将状态处理放在类中，以后再做调整
 public class MainActivity extends AppCompatActivity implements IvideoStatusCallBack{
@@ -36,10 +39,12 @@ public class MainActivity extends AppCompatActivity implements IvideoStatusCallB
     private SurfaceHolder surfaceHolder;
     private SeekBar mSeekbar;
     private TextView mTextShow;
+    private CheckBox cb;
     private String filePath;
     private int mProgressStatus = 0;
     private boolean isPlaying = false;
     private boolean isPause = false;
+    private boolean isAsync = false;
     private String URI = "/storage/emulated/0/Movies/mpeg_ac3.ts";
     //private String URI = "/storage/emulated/0/Movies/AVC_AAC.mp4";
     @Override
@@ -54,6 +59,18 @@ public class MainActivity extends AppCompatActivity implements IvideoStatusCallB
         mSeekbar = (SeekBar) findViewById(R.id.seekbar);
         mTextShow = (TextView)findViewById(R.id.textShow);
         mSeekbar.setOnSeekBarChangeListener(new MySeekBar());
+        cb = (CheckBox)this.findViewById(R.id.cb);
+        cb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                //do something
+                if(isChecked){
+                    isAsync = true;
+                }else{
+                    isAsync = false;
+                }
+            }
+        });
 /*        new Thread(new Runnable() {
             @Override
             public void run() {
@@ -151,7 +168,11 @@ public class MainActivity extends AppCompatActivity implements IvideoStatusCallB
     public void initSurfce(){
         mSurfaceHolder = mPlayerView.getHolder();
         if(mediaCodecClient ==null){
-            mediaCodecClient = new MediaCodecASync(URI,mSurfaceHolder.getSurface(),this.mHandler);
+            if(isAsync){
+                mediaCodecClient = new MediaCodecASync(URI,mSurfaceHolder.getSurface(),this.mHandler);
+            }else{
+                mediaCodecClient = new MediaCodecSync(URI,mSurfaceHolder.getSurface(),this.mHandler);
+            }
             mediaCodecClient.setSizeCallback(mPlayerView);
             mediaCodecClient.setStatusCallback(this);
             mediaCodecClient.startPlay();

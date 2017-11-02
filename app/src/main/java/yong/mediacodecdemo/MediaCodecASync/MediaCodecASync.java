@@ -8,6 +8,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Message;
 import android.util.Log;
 import android.view.Surface;
@@ -23,14 +24,16 @@ import yong.mediacodecdemo.MediaCodecBase;
 
 public class MediaCodecASync extends MediaCodecBase {
 
-    private Boolean isPausing = false;
+
     private String videoFilePath;
 
     private static final String TAG = "MediaCodecASync";
     private static final long TIMEOUT_US = 10000;
-    private static final long SLEEP_US = 10;
+    private static final long SLEEP_US = 1;
     private static final long outOfAudioTimeThreshold = 500; //ms
     private static final long outOfVideoTimeThreshold = 30; //ms
+    private HandlerThread videoDecoderCallbackThread,audioDecoderCallbackThread;
+    private Handler videoDecoderHandler,audioDecoderHandler;
 
     //控制用的video thread
     private VideoThread videoThread;
@@ -84,14 +87,26 @@ public class MediaCodecASync extends MediaCodecBase {
 
     //设置能够暂停播放
     public void setIsPausing(Boolean isPausing){
-        this.isPausing = isPausing;
+        if(isPausing){
+            videoThread.pausePlay();
+            audioThread.pausePlay();
+        }else{
+            videoThread.resumePlay();
+            audioThread.resumePlay();
+        }
     }
 
 
     //MeidaCodec的video线程.....
     private class VideoThread implements Runnable {
+        //判断是否正常播放状态
         private boolean isPlaying = false;
+        private Boolean isPausing = false;
+        private boolean mStartRealease = false;
         private long startVideoMs;
+        private long pauseVideoDuringMs=0;
+        private long pauseVideoStartMs=0;
+        private long pauseVideoEndMs=0;
         //最后正常的时间
         private long lastVideoPresentationTimeMs = 0;
         //seek后正常的时间
@@ -99,12 +114,12 @@ public class MediaCodecASync extends MediaCodecBase {
         //时间差
         private long diffVideoTimeUs;
         private boolean videoIsSeeking=false;
+        //用来标识是否出错
+        private boolean isEOS = false;
         public VideoThread (boolean isPlay){
             isPlaying = isPlay;
         }
-        public void setVideoPlayStatus(boolean isPlay){
-            isPlaying = isPlay;
-        }
+
         public void initVideoExtractor(){
             //初始化extractor的部分
             mVideoExtractor= new MediaExtractor();
@@ -136,10 +151,15 @@ public class MediaCodecASync extends MediaCodecBase {
                 mVideoExtractor.selectTrack(videoTrackIndex);
                 try {
                     mVideoMediaCodec = MediaCodec.createDecoderByType(mediaFormat.getString(MediaFormat.KEY_MIME));
-                    mVideoMediaCodec.configure(mediaFormat, playerSurface, null, 0);
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+                videoDecoderCallbackThread = new HandlerThread("DecoderHanlderThread");
+                videoDecoderCallbackThread.start();
+                videoDecoderHandler = new Handler(videoDecoderCallbackThread.getLooper());
+                setupVideoDecoderCallback(videoDecoderHandler);
+                mVideoMediaCodec.configure(mediaFormat, playerSurface, null, 0);
             }
 
             if (mVideoMediaCodec == null) {
@@ -151,68 +171,120 @@ public class MediaCodecASync extends MediaCodecBase {
         //开始视频的线程......
         @Override
         public void run() {
-
             //video的decoder start.....
             mVideoMediaCodec.start();
-
-            MediaCodec.BufferInfo videoBufferInfo = new MediaCodec.BufferInfo();
-            ByteBuffer[] inputBuffers = mVideoMediaCodec.getInputBuffers();
-//            ByteBuffer[] outputBuffers = videoCodec.getOutputBuffers();
-            boolean isVideoEOS = false;
 
             startVideoMs = System.currentTimeMillis();
             while (!Thread.interrupted()&&isPlaying) {
                 //Log.i(TAG,"just a test_3");
-                if (!isPlaying) {
-                    continue;
-                }
-                if(isPausing){
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    continue;
-                }
-                //将资源传递到解码器
-                if (!isVideoEOS) {
-                    isVideoEOS = putBufferToCoder(mVideoExtractor, mVideoMediaCodec, inputBuffers);
-                }
-                int outputBufferIndex = mVideoMediaCodec.dequeueOutputBuffer(videoBufferInfo, TIMEOUT_US);
-                switch (outputBufferIndex) {
-                    case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                        Log.v(TAG, "format changed");
-                        break;
-                    case MediaCodec.INFO_TRY_AGAIN_LATER:
-                        Log.v(TAG, "解码当前帧超时");
-                        break;
-                    case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
-                        //outputBuffers = videoCodec.getOutputBuffers();
-                        Log.v(TAG, "output buffers changed");
-                        break;
-                    default:
-                        //直接渲染到Surface时使用不到outputBuffer
-                        //ByteBuffer outputBuffer = outputBuffers[outputBufferIndex];
-                        //延时操作
-                        //如果缓冲区里的可展示时间>当前视频播放的进度，就休眠一下
-                        //Log.i(TAG,"just a test_2");
-                        if(sleepVideoRender(mVideoMediaCodec,videoBufferInfo,outputBufferIndex)){
-                            lastVideoPresentationTimeMs = videoBufferInfo.presentationTimeUs/1000;
-                            mVideoMediaCodec.releaseOutputBuffer(outputBufferIndex, true);
-                        }
-                        //Log.i(TAG,"just a test_1");
-                        break;
-                }
-
-                if ((videoBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                    Log.v(TAG, "buffer stream end");
-                    break;
+                try {
+                    Thread.sleep(1000);
+                } catch(InterruptedException  ex) {
                 }
             }//end while
-            mVideoMediaCodec.stop();
-            mVideoMediaCodec.release();
-            mVideoExtractor.release();
+            releaseVideoResource();
         }
+        private void releaseVideoResource(){
+            if(isPlaying == true)
+                isPlaying = false;
+            if(mStartRealease == false) {
+                Log.d(TAG, "Video Thread start releasing !! ");
+                mStartRealease = true;
+                if(mVideoMediaCodec != null)
+                {
+                    mVideoMediaCodec.stop();
+                    mVideoMediaCodec.release();
+                }
+
+                if(mVideoExtractor != null)
+                    mVideoExtractor.release();
+
+                if(videoDecoderCallbackThread != null)
+                {
+                    videoDecoderCallbackThread.quitSafely();
+                    try {
+                        videoDecoderCallbackThread.join();
+                    } catch(InterruptedException  ex) {
+                    }
+                }
+            }
+            Log.d(TAG, "Video Thread normally Stop !! ");
+        }
+
+        //这里是videoDecoder的callback
+        private void setupVideoDecoderCallback(Handler handle)
+        {
+            mVideoMediaCodec.setCallback(new MediaCodec.Callback() {
+                @Override
+                public void onInputBufferAvailable(MediaCodec mc, int inputBufferId)
+                {
+                    if(mStartRealease == true)
+                    {
+                        Log.d(TAG,"video in pausing onInputBufferAvailable");
+                        return;
+                    }
+                    if (!isEOS) {
+                        ByteBuffer buffer = mc.getInputBuffer(inputBufferId);
+                        int sampleSize = mVideoExtractor.readSampleData(buffer, 0);
+                        if (sampleSize < 0) {
+                            Log.d(TAG, "InputBuffer BUFFER_FLAG_END_OF_STREAM " );
+                            mc.queueInputBuffer(inputBufferId, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            isEOS = true;
+                        } else {
+                            if(!isPlaying)
+                            {
+                                Log.d(TAG, "InputBuffer force BUFFER_FLAG_END_OF_STREAM ");
+                                mc.queueInputBuffer(inputBufferId, 0, sampleSize, mVideoExtractor.getSampleTime(), MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                                isEOS = true;
+                            }
+                            else
+                            {
+                                mc.queueInputBuffer(inputBufferId, 0, sampleSize, mVideoExtractor.getSampleTime(), 0);
+                            }
+                            //感觉可以按照seek的方式来处理.....
+                            if(!isPausing){
+                                mVideoExtractor.advance();
+                            }
+                        }
+                    }
+                }
+
+                //同步策略为：如果对比标准时间，小于标准时间超过30ms，则开始丢弃画面，如果大于系统标准时间，则执行1ms的等待
+                //在这里执行同步策略
+                @Override
+                public void onOutputBufferAvailable(MediaCodec mc, int outputBufferId, MediaCodec.BufferInfo info)
+                {
+                    if(mStartRealease == true){
+                        Log.d(TAG,"video in pausing onOutputBufferAvailable");
+                        return;
+                    }
+
+                    if(sleepVideoRender(mc,info,outputBufferId)){
+                        if(mStartRealease == false){
+                            mc.releaseOutputBuffer(outputBufferId, true);
+                        }
+                    }
+                }
+
+                @Override
+                public void onOutputFormatChanged(MediaCodec mc, MediaFormat format)
+                {
+                    Log.d(TAG, "New format " + mc.getOutputFormat());
+                }
+
+                @Override
+                public void onError(MediaCodec codec, MediaCodec.CodecException e)
+                {
+                    Log.d(TAG, "New format onError ");
+                }
+            }, handle);
+        }
+
+
+        public void setVideoPlayStatus(boolean isPlay){
+            isPlaying = isPlay;
+        }
+
         //TODO
         //想了很久，这里还是处理成在音视频线程中分别处理的好.....
         //进行a/v sync
@@ -221,8 +293,9 @@ public class MediaCodecASync extends MediaCodecBase {
             //只对视频做丢帧处理，不对音频做处理
             sendPTSToMain(bufferInfo.presentationTimeUs / 1000);
 
+            //这里如果加了pauseVideoDuringMs，会影响到seek，想一个好的方法解决掉......
             //如果时间差播放时间30ms，开始丢帧
-            if(!videoIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs))
+            if(!videoIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))
             {
                 Log.v(TAG, "video packet too late drop it ... ");
                 mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
@@ -235,11 +308,11 @@ public class MediaCodecASync extends MediaCodecBase {
                 videoThread.seekOver();
             }
             //如果帧的时间大于实际播放时间，则开始休眠
-            //Log.i(TAG,"tjy System.currentTimeMillis() - startVideoMs is:"+String.valueOf(System.currentTimeMillis() - startVideoMs));
-            //Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs /1000+","+" tjy seekVideoNormalTimeUs is:"+seekVideoNormalTimeUs));
-            while (!videoIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekVideoNormalTimeUs > System.currentTimeMillis() - startVideoMs))) {
+            Log.i(TAG,"tjy System.currentTimeMillis() - startVideoMs is:"+String.valueOf(System.currentTimeMillis() - startVideoMs));
+            Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs /1000+","+" tjy seekVideoNormalTimeUs is:"+seekVideoNormalTimeUs+" pauseVideoDuringMs:"+pauseVideoDuringMs));
+            while (!videoIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekVideoNormalTimeUs > System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))) {
                 try {
-                    Log.v(TAG, "try to sleep");
+                    Log.v(TAG, "video try to sleep");
                     Thread.sleep(SLEEP_US);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -268,6 +341,8 @@ public class MediaCodecASync extends MediaCodecBase {
             seekVideoNormalTimeUs = mVideoExtractor.getSampleTime() / 1000;
             Log.i(TAG, "SampleTime after SeekTo : " + mVideoExtractor.getSampleTime());
             diffVideoTimeUs = (seekVideoNormalTimeUs - lastVideoPresentationTimeMs / 1000);
+            //清空pauseVideoDuringMs的影响
+            pauseVideoDuringMs =0;
             Log.d(TAG, "seekTo with diff : " + diffVideoTimeUs);
         }
 
@@ -280,15 +355,36 @@ public class MediaCodecASync extends MediaCodecBase {
         public void seekOver() {
             videoIsSeeking = false;
         }
+
+        public void pausePlay() {
+            //首先通过pause，不让extractor喂资料
+            isPausing = true;
+            pauseVideoStartMs = System.currentTimeMillis();
+        }
+
+        public void resumePlay() {
+            //resume后要重新计算时间
+            isPausing = false;
+            pauseVideoEndMs = System.currentTimeMillis();
+            pauseVideoDuringMs += pauseVideoEndMs-pauseVideoStartMs;
+        }
     }
 
     //设置音频的播放线程
     private class AudioThread extends Thread {
+        private boolean mStartRelease = false;
+        private boolean isPausing = false;
         private boolean isPlaying = false;
         private int audioInputBufferSize;
         private AudioTrack audioTrack;
         private long startAudioMs;
+        private long pauseAudioDuringMs=0;
+        private long pauseAudioStartMs=0;
+        private long pauseAudioEndMs=0;
+        private boolean isEOS = false;
         private boolean audioIsSeeking=false;
+        private byte[] mAudioOutTempBuf;
+        private ByteBuffer[] outputBuffers;
         //最后正常的时间
         private long lastAudioPresentationTimeUs = 0;
         //seek后正常的时间
@@ -330,9 +426,14 @@ public class MediaCodecASync extends MediaCodecBase {
                     //int maxInputSize = mediaFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE);
                     //Log.i(TAG,"MediaFormat.KEY_MAX_INPUT_SIZE:"+maxInputSize);
                     //audioInputBufferSize = minBufferSize > 0 ? minBufferSize * 4 : maxInputSize;
-                    audioInputBufferSize = minBufferSize;
+                    //audioInputBufferSize = minBufferSize;
+                    //int frameSizeInBytes = audioChannels * 2;
+                    //audioInputBufferSize = (audioInputBufferSize / frameSizeInBytes) * frameSizeInBytes;
+/*                    audioInputBufferSize = minBufferSize;
                     int frameSizeInBytes = audioChannels * 2;
-                    audioInputBufferSize = (audioInputBufferSize / frameSizeInBytes) * frameSizeInBytes;
+                    audioInputBufferSize = (audioInputBufferSize / frameSizeInBytes) * frameSizeInBytes;*/
+                    //这个值如果比较小，也会断断续续的......
+                    audioInputBufferSize = minBufferSize* 4;
                     //配置audio相关的track，写入audioTrack即开始播放音视频
                     audioTrack = new AudioTrack(AudioManager.STREAM_MUSIC,
                             audioSampleRate,
@@ -345,6 +446,11 @@ public class MediaCodecASync extends MediaCodecBase {
                     //
                     try {
                         mAduioMediaCodec = MediaCodec.createDecoderByType(mime);
+                        audioDecoderCallbackThread = new HandlerThread("DecoderHanlderThread");
+                        audioDecoderCallbackThread.start();
+                        audioDecoderHandler = new Handler(audioDecoderCallbackThread.getLooper());
+
+                        setupAudioDecoderCallback(audioDecoderHandler);
                         mAduioMediaCodec.configure(mediaFormat, null, null, 0);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -361,83 +467,130 @@ public class MediaCodecASync extends MediaCodecBase {
         public void run() {
 
             mAduioMediaCodec.start();
-            //
-            final ByteBuffer[] buffers = mAduioMediaCodec.getOutputBuffers();
-            int sz = buffers[0].capacity();
-            if (sz <= 0)
-                sz = audioInputBufferSize;
-            byte[] mAudioOutTempBuf = new byte[sz];
-
-            MediaCodec.BufferInfo audioBufferInfo = new MediaCodec.BufferInfo();
-            ByteBuffer[] inputBuffers = mAduioMediaCodec.getInputBuffers();
-            ByteBuffer[] outputBuffers = mAduioMediaCodec.getOutputBuffers();
-            boolean isAudioEOS = false;
             startAudioMs = System.currentTimeMillis();
-
             while (!Thread.interrupted()&&isPlaying) {
-                if (!isPlaying) {
-                    continue;
-                }
-                if(isPausing){
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    continue;
-                }
-
-                if (!isAudioEOS) {
-                    isAudioEOS = putBufferToCoder(mAudioExtractor, mAduioMediaCodec, inputBuffers);
-                }
-                //
-                int outputBufferIndex = mAduioMediaCodec.dequeueOutputBuffer(audioBufferInfo, TIMEOUT_US);
-                switch (outputBufferIndex) {
-                    case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                        Log.v(TAG, "format changed");
-                        break;
-                    case MediaCodec.INFO_TRY_AGAIN_LATER:
-                        Log.v(TAG, "audio 超时");
-                        break;
-                    case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
-                        outputBuffers = mAduioMediaCodec.getOutputBuffers();
-                        Log.v(TAG, "audio output buffers changed");
-                        break;
-                    default:
-                        ByteBuffer outputBuffer = outputBuffers[outputBufferIndex];
-                        //延时操作
-                        //如果缓冲区里的可展示时间>当前视频播放的进度，就休眠一下
-                        if(sleepAudioRender(mAduioMediaCodec,audioBufferInfo,outputBufferIndex)){
-                            if (audioBufferInfo.size > 0) {
-                                if (mAudioOutTempBuf.length < audioBufferInfo.size) {
-                                    mAudioOutTempBuf = new byte[audioBufferInfo.size];
-                                }
-                                outputBuffer.position(0);
-                                outputBuffer.get(mAudioOutTempBuf, 0, audioBufferInfo.size);
-                                outputBuffer.clear();
-                                //写入视频播放
-                                if (audioTrack != null)
-                                    lastAudioPresentationTimeUs = audioBufferInfo.presentationTimeUs;
-                                    audioTrack.write(mAudioOutTempBuf, 0, audioBufferInfo.size);
-                            }
-                            mAduioMediaCodec.releaseOutputBuffer(outputBufferIndex, false);
-                        }
-                        //
-                        break;
-                }
-
-                if ((audioBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                    Log.v(TAG, "buffer stream end");
-                    break;
+                try {
+                    Thread.sleep(1000);
+                } catch(InterruptedException  ex) {
                 }
             }//end while
+            releaseVideoResource();
+        }
 
 
-            mAduioMediaCodec.stop();
-            mAudioExtractor.release();
-            mAduioMediaCodec.release();
-            audioTrack.stop();
-            audioTrack.release();
+        private void setupAudioDecoderCallback(Handler handle)
+        {
+            mAduioMediaCodec.setCallback(new MediaCodec.Callback() {
+                @Override
+                public void onInputBufferAvailable(MediaCodec mc, int inputBufferId)
+                {
+                    if(mStartRelease == true)
+                    {
+                        Log.d(TAG,"audio in pausing onInputBufferAvailable");
+                        return;
+                    }
+
+                    if (!isEOS) {
+                        ByteBuffer buffer = mc.getInputBuffer(inputBufferId);
+                        int sampleSize = mAudioExtractor.readSampleData(buffer, 0);
+                        if (sampleSize < 0) {
+                            Log.d(TAG, "audio InputBuffer BUFFER_FLAG_END_OF_STREAM ");
+                            mc.queueInputBuffer(inputBufferId, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            isEOS = true;
+                        } else {
+                            if(!isPlaying)
+                            {
+                                Log.d(TAG, "audio InputBuffer force BUFFER_FLAG_END_OF_STREAM ");
+                                mc.queueInputBuffer(inputBufferId, 0, sampleSize, mAudioExtractor.getSampleTime(), MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                                isEOS = true;
+                            }
+                            else
+                            {
+                                mc.queueInputBuffer(inputBufferId, 0, sampleSize, mAudioExtractor.getSampleTime(), 0);
+                            }
+                            if(!isPausing){
+                                mAudioExtractor.advance();
+                            }
+
+                        }
+                    }
+                }
+
+                @Override
+                public void onOutputBufferAvailable(MediaCodec mc, int outputBufferId, MediaCodec.BufferInfo info)
+                {
+                    if(mStartRelease == true)
+                    {
+                        Log.d(TAG,"audio in pausing onOutputBufferAvailable");
+                        return;
+                    }
+
+                    ByteBuffer buffer = mc.getOutputBuffer(outputBufferId);
+                    if(sleepAudioRender(mAduioMediaCodec,info,outputBufferId)){
+                        if(info.size > 0 )
+                        {
+                            if(info.size < audioInputBufferSize&&!isPausing)
+                            {
+                                Log.i(TAG, "write " + info.size);
+                                audioTrack.write(buffer, info.size, AudioTrack.WRITE_NON_BLOCKING);
+                            }
+                            else
+                            {
+                                Log.i(TAG, "Audio buffer " + info.size +"over buffersize " + audioInputBufferSize);
+                            }
+                            buffer.clear();
+                            if(mStartRelease == false){
+                                mc.releaseOutputBuffer(outputBufferId, true);
+                            }
+                        }else{
+                            Log.i(TAG, "error_2");
+                        }
+                    }
+                }
+
+                @Override
+                public void onOutputFormatChanged(MediaCodec mc, MediaFormat format)
+                {
+                    Log.d(TAG, "New format " + mc.getOutputFormat());
+                }
+
+                @Override
+                public void onError(MediaCodec codec, MediaCodec.CodecException e)
+                {
+                    Log.d(TAG, "onError");
+                    e.printStackTrace();
+                }
+            }, handle);
+        }
+
+        private void releaseVideoResource(){
+            if(isPlaying == true)
+                isPlaying = false;
+            if(mStartRelease == false) {
+                Log.d(TAG, "audio Thread start releasing !! ");
+                mStartRelease = true;
+                if(mAduioMediaCodec != null)
+                {
+                    mAduioMediaCodec.stop();
+                    mAduioMediaCodec.release();
+                }
+
+                if(mAduioMediaCodec != null)
+                    mAduioMediaCodec.release();
+                if(audioTrack != null) {
+                    audioTrack.stop();
+                    audioTrack.release();
+                }
+                if(audioDecoderCallbackThread != null)
+                {
+                    audioDecoderCallbackThread.quitSafely();
+                    try {
+                        audioDecoderCallbackThread.join();
+                    } catch(InterruptedException  ex) {
+                    }
+                }
+            }
+            Log.d(TAG, "audio Thread normally Stop !! ");
         }
         //TODO
         //想了很久，这里还是处理成在音视频线程中分别处理的好.....
@@ -446,12 +599,12 @@ public class MediaCodecASync extends MediaCodecBase {
             //当时间比较多的时候，就开始等.....
             //Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs / 1000+","+" tjy time is:"+(System.currentTimeMillis() - startMs)));
             //如果时间差播放时间30ms，开始丢帧
-/*            if(!audioIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekAudioNormalTimeUs + outOfAudioTimeThreshold < System.currentTimeMillis() - startAudioMs))
+           if(!audioIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekAudioNormalTimeUs + outOfAudioTimeThreshold < System.currentTimeMillis() - startAudioMs-pauseAudioDuringMs))
             {
                 Log.v(TAG, "audio packet too late drop it ... ");
                 mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
                 return false;
-            }*/
+            }
             //限定seek的容错时间
             if (audioIsSeeking && Math.abs(bufferInfo.presentationTimeUs / 1000 - seekAudioNormalTimeUs) < 100)
             {
@@ -459,12 +612,12 @@ public class MediaCodecASync extends MediaCodecBase {
                 audioThread.seekOver();
             }
             //如果帧的时间大于实际播放时间，则开始休眠
-            while (!audioIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekAudioNormalTimeUs > System.currentTimeMillis() - startAudioMs))) {
+            while (!audioIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekAudioNormalTimeUs > System.currentTimeMillis() - startAudioMs-pauseAudioDuringMs))) {
                 try {
-                    Log.v(TAG, "audio try to sleep");
+                    Log.d(TAG, "audio try to sleep");
                     Thread.sleep(SLEEP_US);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    Log.d(TAG, "error");
                     mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
                     return false;
                 }
@@ -480,6 +633,8 @@ public class MediaCodecASync extends MediaCodecBase {
             mAudioExtractor.seekTo(timeMs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
             seekAudioNormalTimeUs = mAudioExtractor.getSampleTime() / 1000;
             diffAudioTimeUs = (seekAudioNormalTimeUs - lastAudioPresentationTimeUs / 1000);
+            //重置暂停的时间
+            pauseAudioDuringMs =0;
             Log.d(TAG, "seekTo with seekAudioNormalTimeUs : " + seekAudioNormalTimeUs*1000);
             Log.d(TAG, "seekTo with diff : " + diffAudioTimeUs);
         }
@@ -493,6 +648,23 @@ public class MediaCodecASync extends MediaCodecBase {
         public void seekOver() {
             audioIsSeeking = false;
         }
+
+        public void pausePlay() {
+            //首先通过pause，不让extractor喂资料
+            isPausing = true;
+            pauseAudioStartMs =System.currentTimeMillis();
+            audioTrack.flush();
+        }
+
+        public void resumePlay() {
+            //resume后要重新计算时间
+            isPausing = false;
+            pauseAudioEndMs =System.currentTimeMillis();
+            pauseAudioDuringMs += pauseAudioEndMs-pauseAudioStartMs;
+        }
     }
+
+
+
 
 }

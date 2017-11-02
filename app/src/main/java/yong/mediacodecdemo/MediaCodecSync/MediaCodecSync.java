@@ -23,10 +23,9 @@ import yong.mediacodecdemo.MediaCodecBase;
 
 public class MediaCodecSync extends MediaCodecBase {
 
-    private Boolean isPausing = false;
     private String videoFilePath;
 
-    private static final String TAG = "MediaCodecASync";
+    private static final String TAG = "MediaCodecSync";
     private static final long TIMEOUT_US = 10000;
     private static final long SLEEP_US = 10;
     private static final long outOfAudioTimeThreshold = 500; //ms
@@ -83,13 +82,21 @@ public class MediaCodecSync extends MediaCodecBase {
     }
 
     //设置能够暂停播放
+    //设置能够暂停播放
     public void setIsPausing(Boolean isPausing){
-        this.isPausing = isPausing;
+        if(isPausing){
+            videoThread.pausePlay();
+            audioThread.pausePlay();
+        }else{
+            videoThread.resumePlay();
+            audioThread.resumePlay();
+        }
     }
 
 
     //MeidaCodec的video线程.....
     private class VideoThread implements Runnable {
+        private boolean isPausing = false;
         private boolean isPlaying = false;
         private long startVideoMs;
         //最后正常的时间
@@ -98,6 +105,9 @@ public class MediaCodecSync extends MediaCodecBase {
         private long seekVideoNormalTimeUs = 0;
         //时间差
         private long diffVideoTimeUs;
+        private long pauseVideoDuringMs=0;
+        private long pauseVideoStartMs=0;
+        private long pauseVideoEndMs=0;
         private boolean videoIsSeeking=false;
         public VideoThread (boolean isPlay){
             isPlaying = isPlay;
@@ -166,6 +176,7 @@ public class MediaCodecSync extends MediaCodecBase {
                 if (!isPlaying) {
                     continue;
                 }
+                //这种方法暂停后，不容易恢复播放.....这里处理一下....
                 if(isPausing){
                     try {
                         Thread.sleep(100);
@@ -222,7 +233,7 @@ public class MediaCodecSync extends MediaCodecBase {
             sendPTSToMain(bufferInfo.presentationTimeUs / 1000);
 
             //如果时间差播放时间30ms，开始丢帧
-            if(!videoIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs))
+            if(!videoIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))
             {
                 Log.v(TAG, "video packet too late drop it ... ");
                 mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
@@ -235,9 +246,9 @@ public class MediaCodecSync extends MediaCodecBase {
                 videoThread.seekOver();
             }
             //如果帧的时间大于实际播放时间，则开始休眠
-            //Log.i(TAG,"tjy System.currentTimeMillis() - startVideoMs is:"+String.valueOf(System.currentTimeMillis() - startVideoMs));
-            //Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs /1000+","+" tjy seekVideoNormalTimeUs is:"+seekVideoNormalTimeUs));
-            while (!videoIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekVideoNormalTimeUs > System.currentTimeMillis() - startVideoMs))) {
+            Log.i(TAG,"tjy System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs is:"+String.valueOf(System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs)+" pauseVideoDuringMs: "+pauseVideoDuringMs);
+            Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs /1000+","+" tjy seekVideoNormalTimeUs is:"+seekVideoNormalTimeUs));
+            while (!videoIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekVideoNormalTimeUs > System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))) {
                 try {
                     Log.v(TAG, "try to sleep");
                     Thread.sleep(SLEEP_US);
@@ -266,6 +277,7 @@ public class MediaCodecSync extends MediaCodecBase {
             startVideoMs = System.currentTimeMillis();
             mVideoExtractor.seekTo(timeMs, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
             seekVideoNormalTimeUs = mVideoExtractor.getSampleTime() / 1000;
+            pauseVideoDuringMs = 0;
             Log.i(TAG, "SampleTime after SeekTo : " + mVideoExtractor.getSampleTime());
             diffVideoTimeUs = (seekVideoNormalTimeUs - lastVideoPresentationTimeMs / 1000);
             Log.d(TAG, "seekTo with diff : " + diffVideoTimeUs);
@@ -280,15 +292,31 @@ public class MediaCodecSync extends MediaCodecBase {
         public void seekOver() {
             videoIsSeeking = false;
         }
+        public void pausePlay() {
+            //首先通过pause，不让extractor喂资料
+            isPausing = true;
+            pauseVideoStartMs = System.currentTimeMillis();
+        }
+
+        public void resumePlay() {
+            //resume后要重新计算时间
+            isPausing = false;
+            pauseVideoEndMs = System.currentTimeMillis();
+            pauseVideoDuringMs += pauseVideoEndMs-pauseVideoStartMs;
+        }
     }
 
     //设置音频的播放线程
     private class AudioThread extends Thread {
+        private boolean isPausing = false;
         private boolean isPlaying = false;
         private int audioInputBufferSize;
         private AudioTrack audioTrack;
         private long startAudioMs;
         private boolean audioIsSeeking=false;
+        private long pauseAudioDuringMs=0;
+        private long pauseAudioStartMs=0;
+        private long pauseAudioEndMs=0;
         //最后正常的时间
         private long lastAudioPresentationTimeUs = 0;
         //seek后正常的时间
@@ -459,7 +487,7 @@ public class MediaCodecSync extends MediaCodecBase {
                 audioThread.seekOver();
             }
             //如果帧的时间大于实际播放时间，则开始休眠
-            while (!audioIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekAudioNormalTimeUs > System.currentTimeMillis() - startAudioMs))) {
+            while (!audioIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekAudioNormalTimeUs > System.currentTimeMillis() - startAudioMs-pauseAudioDuringMs))) {
                 try {
                     Log.v(TAG, "audio try to sleep");
                     Thread.sleep(SLEEP_US);
@@ -480,6 +508,7 @@ public class MediaCodecSync extends MediaCodecBase {
             mAudioExtractor.seekTo(timeMs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
             seekAudioNormalTimeUs = mAudioExtractor.getSampleTime() / 1000;
             diffAudioTimeUs = (seekAudioNormalTimeUs - lastAudioPresentationTimeUs / 1000);
+            pauseAudioDuringMs = 0;
             Log.d(TAG, "seekTo with seekAudioNormalTimeUs : " + seekAudioNormalTimeUs*1000);
             Log.d(TAG, "seekTo with diff : " + diffAudioTimeUs);
         }
@@ -492,6 +521,20 @@ public class MediaCodecSync extends MediaCodecBase {
 
         public void seekOver() {
             audioIsSeeking = false;
+        }
+
+        public void pausePlay() {
+            //首先通过pause，不让extractor喂资料
+            isPausing = true;
+            pauseAudioStartMs =System.currentTimeMillis();
+            audioTrack.flush();
+        }
+
+        public void resumePlay() {
+            //resume后要重新计算时间
+            isPausing = false;
+            pauseAudioEndMs =System.currentTimeMillis();
+            pauseAudioDuringMs += pauseAudioEndMs-pauseAudioStartMs;
         }
     }
 
