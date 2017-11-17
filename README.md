@@ -1,2 +1,6 @@
 # MediaCodecDemo
-A demo Player use MediaCodec + surfaceView
+A Demo Player use MediaCodec + surfaceView
+
+enable to seek/pause/playback
+
+enable to use sync/Async mode in mediaCodec
