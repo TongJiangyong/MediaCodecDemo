@@ -14,40 +14,44 @@ typedef struct AMediaCodecBufferInfo {
     uint32_t flags;
 } AMediaCodecBufferInfo;
 enum {
+    AMEDIACODEC__OK                          = 0,
     AMEDIACODEC__INFO_OUTPUT_BUFFERS_CHANGED = -3,
     AMEDIACODEC__INFO_OUTPUT_FORMAT_CHANGED  = -2,
     AMEDIACODEC__INFO_TRY_AGAIN_LATER        = -1,
-
     AMEDIACODEC__UNKNOWN_ERROR               = -1000,
+    AMEDIACODEC__ENV_ERROR                   = -1001,
+    AMEDIACODEC__EXCEPTION_ERROR             = -1002,
+    AMEDIACODEC__OUTPUT_BUFFER_ERROR         = -1003,
+    AMEDIACODEC__BYTE_ARRAY_ERROR            = -1003,
 };
-class CMediaCodec {
+class AndroidMediaCodec {
 public:
     jobject createByCodecName(JNIEnv *env, const char *codec_name);
     jobject createDecoderByType(JNIEnv *env, const char *codec_type);
     jobject getAndroidCodec();
     jobject getOutputFormat(JNIEnv *env);
-    ~CMediaCodec();
+    ~AndroidMediaCodec();
     int configureSurface(
             JNIEnv*env,
             jobject media_format,
             jobject android_surface,
             jobject crypto,
             uint32_t flags);
-    int SDL_AMediaCodecJava_start(JNIEnv *env);
-    int SDL_AMediaCodecJava_stop(JNIEnv *env);
-    int SDL_AMediaCodecJava_flush(JNIEnv *env);
-    int SDL_AMediaCodecJava_writeInputData(JNIEnv *env,size_t idx, const uint8_t *data, size_t size);
-    int SDL_AMediaCodecJava_dequeueInputBuffer(JNIEnv *env,int64_t timeoutUs);
-    int SDL_AMediaCodecJava_queueInputBuffer(JNIEnv *env,size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags);
-    int SDL_AMediaCodecJava_dequeueOutputBuffer(JNIEnv *env,int64_t timeoutUs);
-    int SDL_AMediaCodecJava_releaseOutputBuffer(JNIEnv *env,size_t idx, bool render);
+    int start(JNIEnv *env);
+    int stop(JNIEnv *env);
+    int flush(JNIEnv *env);
+    int writeInputData(JNIEnv *env,size_t idx, const uint8_t *data, size_t size);
+    int dequeueInputBuffer(JNIEnv *env,int64_t timeoutUs);
+    int queueInputBuffer(JNIEnv *env,size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags);
+    int dequeueOutputBuffer(JNIEnv *env, AMediaCodecBufferInfo &info, int64_t timeoutUs);
+    int releaseOutputBuffer(JNIEnv *env,size_t idx, bool render);
     int release(JNIEnv *env);
+
+private:
+    bool checkJNIEnv(JNIEnv *env);
 private:
     jobject android_mediacodec_ = nullptr;
     jobject output_buffer_info_ = nullptr;
-    AMediaCodecBufferInfo info_;
-    jobject android_input_mediaformat_ = nullptr;
-    jobject android_surface_ = nullptr;
     bool is_input_buffer_valid_ = false;
 };
 

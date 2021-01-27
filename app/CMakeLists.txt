@@ -44,7 +44,7 @@ set(SOURCES
 	${SRC_OS_PATH}/Build.c
 	${SRC_OS_PATH}/Bundle.c
 	${SRCPATH}/media_player_test.cpp
-	${SRCPATH}/CMediaCodec.cpp
+	${SRCPATH}/AndroidMediaCodec.cpp
 	${SRCPATH}/JniHandler.cpp
 )
 

@@ -105,7 +105,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
     public native void releaseCodec();
     public native int dequeueInputBuffer(long timeoutUs);
     public native void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags,ByteBuffer inputBuffer);
-    public native int dequeueOutputBuffer(long timeoutUs);
+    public native long[] dequeueOutputBuffer(long timeoutUs);
     public native void releaseOutputBuffer(int index, boolean render);
     //将缓冲区传递至解码器
     protected boolean putBufferToCoder(MediaExtractor extractor) {
@@ -219,7 +219,9 @@ public class MediaCodecSyncTest extends MediaCodecBase {
                 if (!isVideoEOS) {
                     isVideoEOS = putBufferToCoder(mVideoExtractor);
                 }
-                int outputBufferIndex = dequeueOutputBuffer(TIMEOUT_US);
+                long[] outputBufferOut = dequeueOutputBuffer(TIMEOUT_US);
+                int outputBufferIndex = (int)outputBufferOut[0];
+                long presentTime = outputBufferOut[1];
                 switch (outputBufferIndex) {
                     case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
                         Log.v(TAG, "format changed");
@@ -237,7 +239,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
                         //延时操作
                         //如果缓冲区里的可展示时间>当前视频播放的进度，就休眠一下
                         Log.i(TAG,"try to render");
-                        if(sleepVideoRender(videoBufferInfo,outputBufferIndex)){
+                        if(sleepVideoRender(presentTime,outputBufferIndex)){
                             lastVideoPresentationTimeMs = videoBufferInfo.presentationTimeUs/1000;
                             releaseOutputBuffer(outputBufferIndex, true);
                         }
@@ -256,28 +258,28 @@ public class MediaCodecSyncTest extends MediaCodecBase {
         }
         //TODO
         //bufferInfo 没有值，所以暂时不处理
-        private boolean sleepVideoRender(MediaCodec.BufferInfo bufferInfo, int outputBufferIndex) {
+        private boolean sleepVideoRender(long presentationTimeUs, int outputBufferIndex) {
             //当时间比较多的时候，就开始等.....
             //只对视频做丢帧处理，不对音频做处理
-            sendPTSToMain(bufferInfo.presentationTimeUs / 1000);
+            sendPTSToMain(presentationTimeUs / 1000);
 
             //如果时间差播放时间30ms，开始丢帧
-            if(!videoIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))
+            if(!videoIsSeeking&&((presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))
             {
                 Log.v(TAG, "video packet too late drop it ... ");
                 //releaseOutputBuffer(outputBufferIndex, false);
                 //return false;
             }
             //限定seek的容错时间
-            if (videoIsSeeking && Math.abs(bufferInfo.presentationTimeUs / 1000 - seekVideoNormalTimeUs) < 100)
+            if (videoIsSeeking && Math.abs(presentationTimeUs / 1000 - seekVideoNormalTimeUs) < 100)
             {
                 //Log.v(TAG, "tjy video seek结束....");
                 videoThread.seekOver();
             }
             //如果帧的时间大于实际播放时间，则开始休眠
             Log.i(TAG,"tjy System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs is:"+String.valueOf(System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs)+" pauseVideoDuringMs: "+pauseVideoDuringMs);
-            Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs /1000+","+" tjy seekVideoNormalTimeUs is:"+seekVideoNormalTimeUs));
-            while (!videoIsSeeking&&((bufferInfo.presentationTimeUs/ 1000 - seekVideoNormalTimeUs > System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))) {
+            Log.i(TAG,String.valueOf(presentationTimeUs /1000+","+" tjy seekVideoNormalTimeUs is:"+seekVideoNormalTimeUs));
+            while (!videoIsSeeking&&((presentationTimeUs/ 1000 - seekVideoNormalTimeUs > System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))) {
                 try {
                     Log.v(TAG, "try to sleep");
                     Thread.sleep(SLEEP_US);

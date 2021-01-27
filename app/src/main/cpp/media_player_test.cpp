@@ -10,14 +10,14 @@
 #include <mutex>
 #include "j4a/j4a_base.h"
 #include "media_player_test.h"
-#include "CMediaCodec.h"
+#include "AndroidMediaCodec.h"
 
 
 #define MEDIACODEC_PREFIX yong_mediacodecdemo_MediaCodecSync
 #define CONCAT1(prefix, class, function) CONCAT2(prefix, class, function)
 #define CONCAT2(prefix, class, function) Java_##prefix##_##class##_##function
 #define MEDIACODEC_JAVA_INTERFACE(function) CONCAT1(MEDIACODEC_PREFIX, MediaCodecSyncTest, function)
-static CMediaCodec* codec_ = nullptr;
+static AndroidMediaCodec* codec_ = nullptr;
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +26,7 @@ extern "C" {
 JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(createDecoderByType)(JNIEnv *env, jobject instance, jstring type) {
 
     if (!codec_) {
-        codec_ = new CMediaCodec();
+        codec_ = new AndroidMediaCodec();
     }
     const char *type_string = nullptr;
     type_string = env->GetStringUTFChars(type, 0);
@@ -56,7 +56,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(startCodec)(JNIEnv *env, jobjec
         XLOGD("startCodec error codec_ is null");
         return;
     }
-    codec_->SDL_AMediaCodecJava_start(env);
+    codec_->start(env);
     return;
 }
 
@@ -66,7 +66,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(stopCodec)(JNIEnv *env, jobject
         XLOGD("stopCodec error codec_ is null");
         return;
     }
-    codec_->SDL_AMediaCodecJava_stop(env);
+    codec_->stop(env);
     return;
 }
 
@@ -80,13 +80,13 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseCodec)(JNIEnv *env, jobj
     return;
 }
 
-JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueInputBuffer)(JNIEnv *env, jobject instance,jlong timeoutUs) {
+JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(InputBuffer)(JNIEnv *env, jobject instance,jlong timeoutUs) {
     XLOGD("dequeueInputBuffer");
     if (!codec_) {
         XLOGD("dequeueInputBuffer error codec_ is null");
         return -1;
     }
-    int index = codec_->SDL_AMediaCodecJava_dequeueInputBuffer(env,timeoutUs);
+    int index = codec_->dequeueInputBuffer(env,timeoutUs);
     XLOGD("dequeueInputBuffer index:%d",index);
     return index;
 }
@@ -98,20 +98,26 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(queueInputBuffer)(JNIEnv *env, 
         return;
     }
     void *direct_video_buffer = env->GetDirectBufferAddress(inputBuffer);
-    codec_->SDL_AMediaCodecJava_writeInputData(env,index, (const uint8_t *)direct_video_buffer, size);
-    codec_->SDL_AMediaCodecJava_queueInputBuffer(env,index,offset,size,presentationTimeUs,flags);
+    codec_->writeInputData(env,index, (const uint8_t *)direct_video_buffer, size);
+    codec_->queueInputBuffer(env,index,offset,size,presentationTimeUs,flags);
     return;
 }
 
-JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueOutputBuffer)(JNIEnv *env, jobject instance,jlong timeoutUs) {
+JNIEXPORT jlongArray  JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueOutputBuffer)(JNIEnv *env, jobject instance,jlong timeoutUs) {
     XLOGD("dequeueOutputBuffer");
+    jlongArray jlongarray = env->NewLongArray(2);
+    jlong * jlongp = env->GetLongArrayElements(jlongarray, nullptr);
     if (!codec_) {
         XLOGD("dequeueOutputBuffer error codec_ is null");
-        return -1;
+        return nullptr;
     }
-    int index = codec_->SDL_AMediaCodecJava_dequeueOutputBuffer(env,timeoutUs);
+    AMediaCodecBufferInfo info;
+    int index = codec_->dequeueOutputBuffer(env,info,timeoutUs);
+    jlongp[0] = index;
+    jlongp[1] = info.presentationTimeUs;
+    env->ReleaseLongArrayElements(jlongarray, jlongp, 0);
     XLOGD("dequeueOutputBuffer index:%d",index);
-    return index;
+    return jlongarray;
 }
 
 JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseOutputBuffer)(JNIEnv *env, jobject instance,jint index, jboolean render) {
@@ -120,7 +126,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseOutputBuffer)(JNIEnv *en
         XLOGD("releaseOutputBuffer error codec_ is null");
         return;
     }
-    codec_->SDL_AMediaCodecJava_releaseOutputBuffer(env,index,render);
+    codec_->releaseOutputBuffer(env,index,render);
     return;
 }
 
