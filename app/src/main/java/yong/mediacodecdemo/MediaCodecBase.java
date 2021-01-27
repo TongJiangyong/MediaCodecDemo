@@ -52,14 +52,14 @@ public abstract class MediaCodecBase {
         return trackIndex;
     }
 
-
+    ByteBuffer inputBufferTest = ByteBuffer.allocateDirect(1024 * 1000 * 8);
     //将缓冲区传递至解码器
     protected boolean putBufferToCoder(MediaExtractor extractor, MediaCodec decoder, ByteBuffer[] inputBuffers) {
         boolean isMediaEOS = false;
         int inputBufferIndex = decoder.dequeueInputBuffer(TIMEOUT_US);
         if (inputBufferIndex >= 0) {
-            ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
-            int sampleSize = extractor.readSampleData(inputBuffer, 0);
+            //ByteBuffer inputBuffer = inputBuffers[inputBufferIndex];
+            int sampleSize = extractor.readSampleData(inputBufferTest, 0);
             if (sampleSize < 0) {
                 decoder.queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                 isMediaEOS = true;
@@ -69,6 +69,7 @@ public abstract class MediaCodecBase {
                 extractor.advance();
             }
         }
+        //inputBufferTest.clear();
         return isMediaEOS;
     }
 

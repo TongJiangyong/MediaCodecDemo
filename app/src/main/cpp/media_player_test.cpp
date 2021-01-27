@@ -31,7 +31,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(createDecoderByType)(JNIEnv *en
     const char *type_string = nullptr;
     type_string = env->GetStringUTFChars(type, 0);
     XLOGD("createDecoderByType %s",type_string);
-    codec_->createByCodecName(env,type_string);
+    codec_->createDecoderByType(env,type_string);
     env->ReleaseStringUTFChars(type, type_string);
     return;
 }
@@ -40,13 +40,13 @@ JNIEXPORT void JNICALL Java_yong_mediacodecdemo_MainActivity_testA(JNIEnv *env, 
     XLOGD("testA");
 }
 
-JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(configure)(JNIEnv *env, jobject instance,jobject surface, jobject crypto, jint flags) {
+JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(configure)(JNIEnv *env, jobject instance,jobject media_format, jobject surface, jobject crypto, jint flags) {
     XLOGD("configure");
     if (!codec_) {
         XLOGD("configure error codec_ is null");
         return;
     }
-    codec_->configureSurface(env,surface,crypto,flags);
+    codec_->configureSurface(env,media_format,surface,crypto,flags);
     return;
 }
 
@@ -56,7 +56,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(startCodec)(JNIEnv *env, jobjec
         XLOGD("startCodec error codec_ is null");
         return;
     }
-    codec_->SDL_AMediaCodecJava_start();
+    codec_->SDL_AMediaCodecJava_start(env);
     return;
 }
 
@@ -66,7 +66,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(stopCodec)(JNIEnv *env, jobject
         XLOGD("stopCodec error codec_ is null");
         return;
     }
-    codec_->SDL_AMediaCodecJava_stop();
+    codec_->SDL_AMediaCodecJava_stop(env);
     return;
 }
 
@@ -76,7 +76,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseCodec)(JNIEnv *env, jobj
         XLOGD("releaseCodec error codec_ is null");
         return;
     }
-    codec_->release();
+    codec_->release(env);
     return;
 }
 
@@ -86,18 +86,20 @@ JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueInputBuffer)(JNIEnv *env,
         XLOGD("dequeueInputBuffer error codec_ is null");
         return -1;
     }
-    int index = codec_->SDL_AMediaCodecJava_dequeueInputBuffer(timeoutUs);
+    int index = codec_->SDL_AMediaCodecJava_dequeueInputBuffer(env,timeoutUs);
     XLOGD("dequeueInputBuffer index:%d",index);
-    return 0;
+    return index;
 }
 
-JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(queueInputBuffer)(JNIEnv *env, jobject instance,jint index, jint offset, jint size, jlong presentationTimeUs, jint flags) {
+JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(queueInputBuffer)(JNIEnv *env, jobject instance,jint index, jint offset, jint size, jlong presentationTimeUs, jint flags,jobject inputBuffer) {
     XLOGD("queueInputBuffer");
     if (!codec_) {
         XLOGD("queueInputBuffer error codec_ is null");
         return;
     }
-    codec_->SDL_AMediaCodecJava_queueInputBuffer(index,offset,size,presentationTimeUs,flags);
+    void *direct_video_buffer = env->GetDirectBufferAddress(inputBuffer);
+    codec_->SDL_AMediaCodecJava_writeInputData(env,index, (const uint8_t *)direct_video_buffer, size);
+    codec_->SDL_AMediaCodecJava_queueInputBuffer(env,index,offset,size,presentationTimeUs,flags);
     return;
 }
 
@@ -107,9 +109,9 @@ JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueOutputBuffer)(JNIEnv *env
         XLOGD("dequeueOutputBuffer error codec_ is null");
         return -1;
     }
-    int index = codec_->SDL_AMediaCodecJava_dequeueOutputBuffer(timeoutUs);
+    int index = codec_->SDL_AMediaCodecJava_dequeueOutputBuffer(env,timeoutUs);
     XLOGD("dequeueOutputBuffer index:%d",index);
-    return 0;
+    return index;
 }
 
 JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseOutputBuffer)(JNIEnv *env, jobject instance,jint index, jboolean render) {
@@ -118,7 +120,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseOutputBuffer)(JNIEnv *en
         XLOGD("releaseOutputBuffer error codec_ is null");
         return;
     }
-    codec_->SDL_AMediaCodecJava_releaseOutputBuffer(index,render);
+    codec_->SDL_AMediaCodecJava_releaseOutputBuffer(env,index,render);
     return;
 }
 

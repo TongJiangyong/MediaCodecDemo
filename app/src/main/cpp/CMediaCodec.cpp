@@ -15,36 +15,37 @@ jobject CMediaCodec::createByCodecName(JNIEnv *env, const char *codec_name)
         return NULL;
     }
 
-    android_mediacodec = android_mediacodec;
+    android_mediacodec_ = J4A_NewGlobalRef__catchAll(env, android_mediacodec);
     JNI_DeleteLocalRefP(env, &android_mediacodec);
-    return android_mediacodec;
+    return android_mediacodec_;
 }
 
-jobject CMediaCodec::createByType(JNIEnv *env, const char *codec_name)
+jobject CMediaCodec::createDecoderByType(JNIEnv *env, const char *codec_type)
 {
-    jobject android_mediacodec = J4AC_MediaCodec__createByCodecName__withCString__catchAll(env, codec_name);
+    jobject android_mediacodec = J4AC_MediaCodec__createDecoderByType__withCString__catchAll(env, codec_type);
     if (!android_mediacodec) {
         return NULL;
     }
 
-    android_mediacodec = android_mediacodec;
+    android_mediacodec_ = J4A_NewGlobalRef__catchAll(env, android_mediacodec);
     JNI_DeleteLocalRefP(env, &android_mediacodec);
-    return android_mediacodec;
+    return android_mediacodec_;
 }
 
 jobject CMediaCodec::getAndroidCodec()
 {
-    return android_mediacodec;
+    return android_mediacodec_;
 }
 
-jobject CMediaCodec::getOutputFormat()
+jobject CMediaCodec::getOutputFormat(JNIEnv *env)
 {
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return NULL;
-    }
-    jobject local_android_format = J4AC_MediaCodec__getOutputFormat__catchAll(env, android_mediacodec);
+//    JNIEnv *env = NULL;
+//TODO fix this
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return NULL;
+//    }
+    jobject local_android_format = J4AC_MediaCodec__getOutputFormat__catchAll(env, android_mediacodec_);
     if (!local_android_format) {
         return NULL;
     }
@@ -63,49 +64,51 @@ CMediaCodec::~CMediaCodec()
         XLOGE("SDL_AMediaCodecJava_delete: SetupThreadEnv failed");
         return;
     }
-    if (android_mediacodec) {
-        J4AC_MediaCodec__release__catchAll(env, android_mediacodec);
+    if (android_mediacodec_) {
+        J4AC_MediaCodec__release__catchAll(env, android_mediacodec_);
     }
-    if (android_input_mediaformat) {
-        JNI_DeleteGlobalRefP(env, &android_input_mediaformat);
+    if (android_input_mediaformat_) {
+        JNI_DeleteGlobalRefP(env, &android_input_mediaformat_);
     }
-    if (output_buffer_info) {
-        JNI_DeleteGlobalRefP(env, &output_buffer_info);
+    if (output_buffer_info_) {
+        JNI_DeleteGlobalRefP(env, &output_buffer_info_);
     }
-    if (android_mediacodec) {
-        JNI_DeleteGlobalRefP(env, &android_mediacodec);
+    if (android_mediacodec_) {
+        JNI_DeleteGlobalRefP(env, &android_mediacodec_);
     }
 }
 
 int CMediaCodec::configureSurface(
         JNIEnv*env,
+        jobject media_format,
         jobject android_surface,
         jobject crypto,
         uint32_t flags)
 {
     XLOGD("%s", __func__);
-
-    XLOGE("configure acodec:%p format:%p: surface:%p", android_mediacodec, android_input_mediaformat, android_surface);
-    J4AC_MediaCodec__configure(env, android_mediacodec, android_input_mediaformat, android_surface, crypto, flags);
+    android_input_mediaformat_ =  J4A_NewGlobalRef__catchAll(env, media_format);
+    android_surface_ =   J4A_NewGlobalRef__catchAll(env, android_surface);
+    J4AC_MediaCodec__configure(env, android_mediacodec_, media_format, android_surface, crypto, flags);
+    XLOGE("configure acodec:%p format:%p: surface:%p", android_mediacodec_, android_input_mediaformat_, android_surface_);
     if (J4A_ExceptionCheck__catchAll(env)) {
         return -1;
     }
 
-    is_input_buffer_valid = true;
+    is_input_buffer_valid_ = true;
     return 0;
 }
 
-int CMediaCodec::SDL_AMediaCodecJava_start()
+int CMediaCodec::SDL_AMediaCodecJava_start(JNIEnv *env)
 {
     XLOGD("%s", __func__);
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return -1;
-    }
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return -1;
+//    }
 
-    J4AC_MediaCodec__start(env, android_mediacodec);
+    J4AC_MediaCodec__start(env, android_mediacodec_);
     if (J4A_ExceptionCheck__catchAll(env)) {
         XLOGE("%s: start failed", __func__);
         return -1;
@@ -114,16 +117,16 @@ int CMediaCodec::SDL_AMediaCodecJava_start()
     return 0;
 }
 
-int CMediaCodec::SDL_AMediaCodecJava_stop()
+int CMediaCodec::SDL_AMediaCodecJava_stop(JNIEnv *env)
 {
     XLOGD("%s", __func__);
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return -1;
-    }
-    J4AC_MediaCodec__stop(env, android_mediacodec);
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return -1;
+//    }
+    J4AC_MediaCodec__stop(env, android_mediacodec_);
     if (J4A_ExceptionCheck__catchAll(env)) {
         XLOGE("%s: stop", __func__);
         return -1;
@@ -132,17 +135,17 @@ int CMediaCodec::SDL_AMediaCodecJava_stop()
     return 0;
 }
 
-int CMediaCodec::SDL_AMediaCodecJava_flush()
+int CMediaCodec::SDL_AMediaCodecJava_flush(JNIEnv *env)
 {
     XLOGD("%s", __func__);
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return -1;
-    }
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return -1;
+//    }
 
-    J4AC_MediaCodec__flush(env, android_mediacodec);
+    J4AC_MediaCodec__flush(env, android_mediacodec_);
     if (J4A_ExceptionCheck__catchAll(env)) {
         XLOGE("%s: flush", __func__);
         return -1;
@@ -151,20 +154,20 @@ int CMediaCodec::SDL_AMediaCodecJava_flush()
     return 0;
 }
 
-int CMediaCodec::SDL_AMediaCodecJava_writeInputData(size_t idx, const uint8_t *data, size_t size)
+int CMediaCodec::SDL_AMediaCodecJava_writeInputData(JNIEnv *env,size_t idx, const uint8_t *data, size_t size)
 {
     XLOGD("%s", __func__);
     ssize_t write_ret = -1;
     jobject input_buffer_array = NULL;
     jobject input_buffer = NULL;
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return -1;
-    }
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return -1;
+//    }
 
-    input_buffer_array = J4AC_MediaCodec__getInputBuffers__catchAll(env, android_mediacodec);
+    input_buffer_array = J4AC_MediaCodec__getInputBuffers__catchAll(env, android_mediacodec_);
     if (!input_buffer_array)
         return -1;
 
@@ -194,15 +197,15 @@ int CMediaCodec::SDL_AMediaCodecJava_writeInputData(size_t idx, const uint8_t *d
     return write_ret;
 }
 
-int  CMediaCodec::SDL_AMediaCodecJava_dequeueInputBuffer(int64_t timeoutUs)
+int  CMediaCodec::SDL_AMediaCodecJava_dequeueInputBuffer(JNIEnv *env,int64_t timeoutUs)
 {
     XLOGD("%s(%d)", __func__, (int)timeoutUs);
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return -1;
-    }
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return -1;
+//    }
 
     //SDL_AMediaCodec_Opaque *opaque = (SDL_AMediaCodec_Opaque *)acodec->opaque;
     // docs lie, getInputBuffers should be good after
@@ -213,27 +216,27 @@ int  CMediaCodec::SDL_AMediaCodecJava_dequeueInputBuffer(int64_t timeoutUs)
     //    return -1;
     //}
 
-    jint idx = J4AC_MediaCodec__dequeueInputBuffer(env, android_mediacodec, (jlong)timeoutUs);
+    jint idx = J4AC_MediaCodec__dequeueInputBuffer(env, android_mediacodec_, (jlong)timeoutUs);
     if (J4A_ExceptionCheck__catchAll(env)) {
         XLOGE("%s: dequeueInputBuffer failed", __func__);
-        is_input_buffer_valid = false;
+        is_input_buffer_valid_ = false;
         return -1;
     }
 
     return idx;
 }
 
-int  CMediaCodec::SDL_AMediaCodecJava_queueInputBuffer(size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags)
+int  CMediaCodec::SDL_AMediaCodecJava_queueInputBuffer(JNIEnv *env,size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags)
 {
     XLOGD("%s: %d", __func__, (int)idx);
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("SDL_AMediaCodecJava_queueInputBuffer: SetupThreadEnv failed");
-        return -1;
-    }
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("SDL_AMediaCodecJava_queueInputBuffer: SetupThreadEnv failed");
+//        return -1;
+//    }
 
-    J4AC_MediaCodec__queueInputBuffer(env, android_mediacodec, (jint)idx, (jint)offset, (jint)size, (jlong)time, (jint)flags);
+    J4AC_MediaCodec__queueInputBuffer(env, android_mediacodec_, (jint)idx, (jint)offset, (jint)size, (jlong)time, (jint)flags);
     if (J4A_ExceptionCheck__catchAll(env)) {
         return -1;
     }
@@ -241,25 +244,25 @@ int  CMediaCodec::SDL_AMediaCodecJava_queueInputBuffer(size_t idx, off_t offset,
     return 0;
 }
 
-int CMediaCodec::SDL_AMediaCodecJava_dequeueOutputBuffer(int64_t timeoutUs)
+int CMediaCodec::SDL_AMediaCodecJava_dequeueOutputBuffer(JNIEnv *env,int64_t timeoutUs)
 {
     XLOGD("%s(%d)", __func__, (int)timeoutUs);
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return -1;
-    }
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return -1;
+//    }
 
-    if (!output_buffer_info) {
-        output_buffer_info = J4AC_MediaCodec__BufferInfo__BufferInfo__asGlobalRef__catchAll(env);
-        if (!output_buffer_info)
+    if (!output_buffer_info_) {
+        output_buffer_info_ = J4AC_MediaCodec__BufferInfo__BufferInfo__asGlobalRef__catchAll(env);
+        if (!output_buffer_info_)
             return -1;
     }
 
     jint idx = -1;
     while (1) {
-        idx = J4AC_MediaCodec__dequeueOutputBuffer(env, android_mediacodec, output_buffer_info, (jlong)timeoutUs);
+        idx = J4AC_MediaCodec__dequeueOutputBuffer(env, android_mediacodec_, output_buffer_info_, (jlong)timeoutUs);
         if (J4A_ExceptionCheck__catchAll(env)) {
             XLOGI("%s: Exception\n", __func__);
             return -1;
@@ -271,10 +274,10 @@ int CMediaCodec::SDL_AMediaCodecJava_dequeueOutputBuffer(int64_t timeoutUs)
             XLOGI("%s: INFO_OUTPUT_FORMAT_CHANGED\n", __func__);
         } else if (idx >= 0) {
             XLOGD("%s: buffer ready (%d) ====================\n", __func__, idx);
-            info.offset              = J4AC_MediaCodec__BufferInfo__offset__get__catchAll(env, output_buffer_info);
-            info.size                = J4AC_MediaCodec__BufferInfo__size__get__catchAll(env, output_buffer_info);
-            info.presentationTimeUs  = J4AC_MediaCodec__BufferInfo__presentationTimeUs__get__catchAll(env, output_buffer_info);
-            info.flags               = J4AC_MediaCodec__BufferInfo__flags__get__catchAll(env, output_buffer_info);
+            info_.offset              = J4AC_MediaCodec__BufferInfo__offset__get__catchAll(env, output_buffer_info_);
+            info_.size                = J4AC_MediaCodec__BufferInfo__size__get__catchAll(env, output_buffer_info_);
+            info_.presentationTimeUs  = J4AC_MediaCodec__BufferInfo__presentationTimeUs__get__catchAll(env, output_buffer_info_);
+            info_.flags               = J4AC_MediaCodec__BufferInfo__flags__get__catchAll(env, output_buffer_info_);
         }
         break;
     }
@@ -282,17 +285,17 @@ int CMediaCodec::SDL_AMediaCodecJava_dequeueOutputBuffer(int64_t timeoutUs)
     return idx;
 }
 
-int CMediaCodec::SDL_AMediaCodecJava_releaseOutputBuffer(size_t idx, bool render)
+int CMediaCodec::SDL_AMediaCodecJava_releaseOutputBuffer(JNIEnv *env,size_t idx, bool render)
 {
     XLOGD("%s", __func__);
 
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s(%d, %s): SetupThreadEnv failed", __func__, (int)idx, render ? "true" : "false");
-        return -1;
-    }
+//    JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s(%d, %s): SetupThreadEnv failed", __func__, (int)idx, render ? "true" : "false");
+//        return -1;
+//    }
 
-    J4AC_MediaCodec__releaseOutputBuffer(env, android_mediacodec, (jint)idx, (jboolean)render);
+    J4AC_MediaCodec__releaseOutputBuffer(env, android_mediacodec_, (jint)idx, (jboolean)render);
     if (J4A_ExceptionCheck__catchAll(env)) {
         XLOGE("%s: releaseOutputBuffer\n", __func__);
         return -1;
@@ -301,13 +304,13 @@ int CMediaCodec::SDL_AMediaCodecJava_releaseOutputBuffer(size_t idx, bool render
     return 0;
 }
 
-int CMediaCodec::release() {
+int CMediaCodec::release(JNIEnv *env) {
     XLOGD("%s", __func__);
-    JNIEnv *env = NULL;
-    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
-        XLOGE("%s: SetupThreadEnv failed", __func__);
-        return -1;
-    }
-    J4AC_MediaCodec__release__catchAll(env,android_mediacodec);
+//   JNIEnv *env = NULL;
+//    if (JNI_OK != JNI_SetupThreadEnv(&env)) {
+//        XLOGE("%s: SetupThreadEnv failed", __func__);
+//        return -1;
+//    }
+    J4AC_MediaCodec__release__catchAll(env,android_mediacodec_);
     return 0;
 }

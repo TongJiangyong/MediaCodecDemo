@@ -4,6 +4,7 @@ import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.MediaCodec;
+import android.media.MediaCodecList;
 import android.media.MediaCrypto;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
@@ -19,6 +20,8 @@ import java.nio.ByteBuffer;
 import yong.mediacodecdemo.MediaCodecBase;
 
 import static android.content.ContentValues.TAG;
+import static android.media.MediaCodecList.ALL_CODECS;
+import static android.media.MediaCodecList.REGULAR_CODECS;
 
 /**
  * Created by hasee on 2017/10/31.
@@ -33,7 +36,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
     private static final long SLEEP_US = 10;
     private static final long outOfAudioTimeThreshold = 500; //ms
     private static final long outOfVideoTimeThreshold = 30; //ms
-    ByteBuffer inputBuffer = ByteBuffer.allocateDirect(1024 * 1000);
+    ByteBuffer inputBuffer = ByteBuffer.allocateDirect(1920 * 1080 * 8);
     //控制用的video thread
     private VideoThread videoThread;
     private AudioThread audioThread;
@@ -50,9 +53,9 @@ public class MediaCodecSyncTest extends MediaCodecBase {
     public void startPlay(){
         Log.i(TAG,"startPlay");
         //初始化音频相关
-        audioThread = new AudioThread(true);
-        audioThread.initAudioExtractor();
-        audioThread.initAudioCodec();
+        //audioThread = new AudioThread(true);
+        //audioThread.initAudioExtractor();
+        //audioThread.initAudioCodec();
         //初始化视频相关
         videoThread = new VideoThread(true);
         videoThread.initVideoExtractor();
@@ -96,12 +99,12 @@ public class MediaCodecSyncTest extends MediaCodecBase {
         }
     }
     public native void createDecoderByType(String type);
-    public native void configure(Surface surface, MediaCrypto crypto, int flags);
+    public native void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags);
     public native void startCodec();
     public native void stopCodec();
     public native void releaseCodec();
     public native int dequeueInputBuffer(long timeoutUs);
-    public native void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags);
+    public native void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags,ByteBuffer inputBuffer);
     public native int dequeueOutputBuffer(long timeoutUs);
     public native void releaseOutputBuffer(int index, boolean render);
     //将缓冲区传递至解码器
@@ -112,11 +115,11 @@ public class MediaCodecSyncTest extends MediaCodecBase {
 
             int sampleSize = extractor.readSampleData(inputBuffer, 0);
             if (sampleSize < 0) {
-                queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM,inputBuffer);
                 isMediaEOS = true;
                 Log.v(TAG, "media eos");
             } else {
-                queueInputBuffer(inputBufferIndex, 0, sampleSize, extractor.getSampleTime(), 0);
+                queueInputBuffer(inputBufferIndex, 0, sampleSize, extractor.getSampleTime(), 0,inputBuffer);
                 extractor.advance();
             }
             //TODO deal with inputBuffer
@@ -176,9 +179,10 @@ public class MediaCodecSyncTest extends MediaCodecBase {
 
                 mVideoExtractor.selectTrack(videoTrackIndex);
                 try {
+                    MediaCodecList codecList = new MediaCodecList(ALL_CODECS);
+                    String test = codecList.findDecoderForFormat(mediaFormat);
                     createDecoderByType(mediaFormat.getString(MediaFormat.KEY_MIME));
-
-                    configure(playerSurface, null, 0);
+                    configure(mediaFormat,playerSurface, null, 0);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -232,7 +236,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
                         //ByteBuffer outputBuffer = outputBuffers[outputBufferIndex];
                         //延时操作
                         //如果缓冲区里的可展示时间>当前视频播放的进度，就休眠一下
-                        //Log.i(TAG,"just a test_2");
+                        Log.i(TAG,"try to render");
                         if(sleepVideoRender(videoBufferInfo,outputBufferIndex)){
                             lastVideoPresentationTimeMs = videoBufferInfo.presentationTimeUs/1000;
                             releaseOutputBuffer(outputBufferIndex, true);
@@ -251,8 +255,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
             mVideoExtractor.release();
         }
         //TODO
-        //想了很久，这里还是处理成在音视频线程中分别处理的好.....
-        //进行a/v sync
+        //bufferInfo 没有值，所以暂时不处理
         private boolean sleepVideoRender(MediaCodec.BufferInfo bufferInfo, int outputBufferIndex) {
             //当时间比较多的时候，就开始等.....
             //只对视频做丢帧处理，不对音频做处理
@@ -262,8 +265,8 @@ public class MediaCodecSyncTest extends MediaCodecBase {
             if(!videoIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))
             {
                 Log.v(TAG, "video packet too late drop it ... ");
-                releaseOutputBuffer(outputBufferIndex, false);
-                return false;
+                //releaseOutputBuffer(outputBufferIndex, false);
+                //return false;
             }
             //限定seek的容错时间
             if (videoIsSeeking && Math.abs(bufferInfo.presentationTimeUs / 1000 - seekVideoNormalTimeUs) < 100)

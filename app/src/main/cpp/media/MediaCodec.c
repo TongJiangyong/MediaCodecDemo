@@ -36,6 +36,7 @@ typedef struct J4AC_android_media_MediaCodec {
     jclass id;
 
     jmethodID method_createByCodecName;
+    jmethodID method_createDecoderByType;
     jmethodID method_configure;
     jmethodID method_getOutputFormat;
     jmethodID method_getInputBuffers;
@@ -251,9 +252,24 @@ jobject J4AC_android_media_MediaCodec__createByCodecName(JNIEnv *env, jstring na
     return (*env)->CallStaticObjectMethod(env, class_J4AC_android_media_MediaCodec.id, class_J4AC_android_media_MediaCodec.method_createByCodecName, name);
 }
 
+jobject J4AC_android_media_MediaCodec__createDecoderByType(JNIEnv *env, jstring name)
+{
+    return (*env)->CallStaticObjectMethod(env, class_J4AC_android_media_MediaCodec.id, class_J4AC_android_media_MediaCodec.method_createDecoderByType, name);
+}
+
 jobject J4AC_android_media_MediaCodec__createByCodecName__catchAll(JNIEnv *env, jstring name)
 {
     jobject ret_object = J4AC_android_media_MediaCodec__createByCodecName(env, name);
+    if (J4A_ExceptionCheck__catchAll(env) || !ret_object) {
+        return NULL;
+    }
+
+    return ret_object;
+}
+
+jobject J4AC_android_media_MediaCodec__createDecoderByType__catchAll(JNIEnv *env, jstring name)
+{
+    jobject ret_object = J4AC_android_media_MediaCodec__createDecoderByType(env, name);
     if (J4A_ExceptionCheck__catchAll(env) || !ret_object) {
         return NULL;
     }
@@ -281,6 +297,26 @@ fail:
     return ret_object;
 }
 
+jobject J4AC_android_media_MediaCodec__createDecoderByType__asGlobalRef__catchAll(JNIEnv *env, jstring name)
+{
+    jobject ret_object   = NULL;
+    jobject local_object = J4AC_android_media_MediaCodec__createDecoderByType__catchAll(env, name);
+    if (J4A_ExceptionCheck__catchAll(env) || !local_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    ret_object = J4A_NewGlobalRef__catchAll(env, local_object);
+    if (!ret_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    fail:
+    J4A_DeleteLocalRef__p(env, &local_object);
+    return ret_object;
+}
+
 jobject J4AC_android_media_MediaCodec__createByCodecName__withCString(JNIEnv *env, const char *name_cstr__)
 {
     jobject ret_object = NULL;
@@ -297,6 +333,27 @@ jobject J4AC_android_media_MediaCodec__createByCodecName__withCString(JNIEnv *en
     }
 
 fail:
+    J4A_DeleteLocalRef__p(env, &name);
+    return ret_object;
+}
+
+
+jobject J4AC_android_media_MediaCodec__createDecoderByType__withCString(JNIEnv *env, const char *name_cstr__)
+{
+    jobject ret_object = NULL;
+    jstring name = NULL;
+
+    name = (*env)->NewStringUTF(env, name_cstr__);
+    if (J4A_ExceptionCheck__throwAny(env) || !name)
+        goto fail;
+
+    ret_object = J4AC_android_media_MediaCodec__createDecoderByType(env, name);
+    if (J4A_ExceptionCheck__throwAny(env) || !ret_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    fail:
     J4A_DeleteLocalRef__p(env, &name);
     return ret_object;
 }
@@ -321,6 +378,26 @@ fail:
     return ret_object;
 }
 
+jobject J4AC_android_media_MediaCodec__createDecoderByType__withCString__catchAll(JNIEnv *env, const char *name_cstr__)
+{
+    jobject ret_object = NULL;
+    jstring name = NULL;
+
+    name = (*env)->NewStringUTF(env, name_cstr__);
+    if (J4A_ExceptionCheck__catchAll(env) || !name)
+        goto fail;
+
+    ret_object = J4AC_android_media_MediaCodec__createDecoderByType__catchAll(env, name);
+    if (J4A_ExceptionCheck__catchAll(env) || !ret_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    fail:
+    J4A_DeleteLocalRef__p(env, &name);
+    return ret_object;
+}
+
 jobject J4AC_android_media_MediaCodec__createByCodecName__withCString__asGlobalRef__catchAll(JNIEnv *env, const char *name_cstr__)
 {
     jobject ret_object   = NULL;
@@ -337,6 +414,26 @@ jobject J4AC_android_media_MediaCodec__createByCodecName__withCString__asGlobalR
     }
 
 fail:
+    J4A_DeleteLocalRef__p(env, &local_object);
+    return ret_object;
+}
+
+jobject J4AC_android_media_MediaCodec__createDecoderByType__withCString__asGlobalRef__catchAll(JNIEnv *env, const char *name_cstr__)
+{
+    jobject ret_object   = NULL;
+    jobject local_object = J4AC_android_media_MediaCodec__createDecoderByType__withCString__catchAll(env, name_cstr__);
+    if (J4A_ExceptionCheck__catchAll(env) || !local_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    ret_object = J4A_NewGlobalRef__catchAll(env, local_object);
+    if (!ret_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    fail:
     J4A_DeleteLocalRef__p(env, &local_object);
     return ret_object;
 }
@@ -551,6 +648,14 @@ int J4A_loadClass__J4AC_android_media_MediaCodec(JNIEnv *env)
     class_J4AC_android_media_MediaCodec.method_createByCodecName = J4A_GetStaticMethodID__catchAll(env, class_id, name, sign);
     if (class_J4AC_android_media_MediaCodec.method_createByCodecName == NULL)
         goto fail;
+
+    class_id = class_J4AC_android_media_MediaCodec.id;
+    name     = "createDecoderByType";
+    sign     = "(Ljava/lang/String;)Landroid/media/MediaCodec;";
+    class_J4AC_android_media_MediaCodec.method_createDecoderByType = J4A_GetStaticMethodID__catchAll(env, class_id, name, sign);
+    if (class_J4AC_android_media_MediaCodec.method_createDecoderByType == NULL)
+        goto fail;
+
 
     class_id = class_J4AC_android_media_MediaCodec.id;
     name     = "configure";

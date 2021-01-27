@@ -47,15 +47,15 @@ public class MediaCodecSync extends MediaCodecBase {
     public void startPlay(){
         Log.i(TAG,"startPlay");
         //初始化音频相关
-        audioThread = new AudioThread(true);
-        audioThread.initAudioExtractor();
-        audioThread.initAudioCodec();
+        //audioThread = new AudioThread(true);
+        //audioThread.initAudioExtractor();
+        //audioThread.initAudioCodec();
         //初始化视频相关
         videoThread = new VideoThread(true);
         videoThread.initVideoExtractor();
         videoThread.initVideoCodec();
         //启动线程
-        new Thread(audioThread).start();
+        //new Thread(audioThread).start();
         new Thread(videoThread).start();
     }
 
