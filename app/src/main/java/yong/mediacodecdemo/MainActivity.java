@@ -23,6 +23,7 @@ import java.lang.reflect.Method;
 import yong.mediacodecdemo.IvideoCallBack.IvideoStatusCallBack;
 import yong.mediacodecdemo.MediaCodecASync.MediaCodecASync;
 import yong.mediacodecdemo.MediaCodecSync.MediaCodecSync;
+import yong.mediacodecdemo.MediaCodecSync.MediaCodecSyncTest;
 
 //暂时将状态处理放在类中，以后再做调整
 public class MainActivity extends AppCompatActivity implements IvideoStatusCallBack{
@@ -45,8 +46,12 @@ public class MainActivity extends AppCompatActivity implements IvideoStatusCallB
     private boolean isPlaying = false;
     private boolean isPause = false;
     private boolean isAsync = false;
-    private String URI = "/storage/emulated/0/Movies/mpeg_ac3.ts";
+    private String URI = "http://114.236.93.153:8080/download/video/zhuangjiyuan.mkv";
     //private String URI = "/storage/emulated/0/Movies/AVC_AAC.mp4";
+    static {
+        System.loadLibrary("cpplibrary");
+    }
+    public native void testA();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -60,6 +65,7 @@ public class MainActivity extends AppCompatActivity implements IvideoStatusCallB
         mTextShow = (TextView)findViewById(R.id.textShow);
         mSeekbar.setOnSeekBarChangeListener(new MySeekBar());
         cb = (CheckBox)this.findViewById(R.id.cb);
+        testA();
         cb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -129,7 +135,7 @@ public class MainActivity extends AppCompatActivity implements IvideoStatusCallB
             Log.i(TAG,"s:"+s);
     }*/
         File videoFile = FileTool.getPathFile(URI);
-        if(videoFile!=null){
+        if(URI!=null){
             showToash("文件存在");
             //filePath = videoFile.getAbsolutePath();
             initSurfce();
@@ -171,7 +177,7 @@ public class MainActivity extends AppCompatActivity implements IvideoStatusCallB
             if(isAsync){
                 mediaCodecClient = new MediaCodecASync(URI,mSurfaceHolder.getSurface(),this.mHandler);
             }else{
-                mediaCodecClient = new MediaCodecSync(URI,mSurfaceHolder.getSurface(),this.mHandler);
+                mediaCodecClient = new MediaCodecSyncTest(URI,mSurfaceHolder.getSurface(),this.mHandler);
             }
             mediaCodecClient.setSizeCallback(mPlayerView);
             mediaCodecClient.setStatusCallback(this);

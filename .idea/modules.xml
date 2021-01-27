@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/MediaCodecDemo.iml" filepath="$PROJECT_DIR$/MediaCodecDemo.iml" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/MediaCodecDemo.iml" filepath="$PROJECT_DIR$/.idea/MediaCodecDemo.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/MediaCodecDemo.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/MediaCodecDemo.app.iml" />
     </modules>
   </component>
 </project>
