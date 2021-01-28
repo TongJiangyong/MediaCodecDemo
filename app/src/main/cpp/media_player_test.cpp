@@ -80,7 +80,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseCodec)(JNIEnv *env, jobj
     return;
 }
 
-JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(InputBuffer)(JNIEnv *env, jobject instance,jlong timeoutUs) {
+JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueInputBuffer)(JNIEnv *env, jobject instance,jlong timeoutUs) {
     XLOGD("dequeueInputBuffer");
     if (!codec_) {
         XLOGD("dequeueInputBuffer error codec_ is null");

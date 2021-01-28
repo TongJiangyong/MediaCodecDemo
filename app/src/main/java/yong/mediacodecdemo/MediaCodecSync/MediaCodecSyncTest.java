@@ -53,16 +53,16 @@ public class MediaCodecSyncTest extends MediaCodecBase {
     public void startPlay(){
         Log.i(TAG,"startPlay");
         //初始化音频相关
-        //audioThread = new AudioThread(true);
-        //audioThread.initAudioExtractor();
-        //audioThread.initAudioCodec();
+        audioThread = new AudioThread(true);
+        audioThread.initAudioExtractor();
+        audioThread.initAudioCodec();
         //初始化视频相关
-        videoThread = new VideoThread(true);
-        videoThread.initVideoExtractor();
-        videoThread.initVideoCodec();
+//        videoThread = new VideoThread(true);
+//        videoThread.initVideoExtractor();
+//        videoThread.initVideoCodec();
         //启动线程
         new Thread(audioThread).start();
-        new Thread(videoThread).start();
+        //new Thread(videoThread).start();
     }
 
     //停止播放
@@ -267,8 +267,8 @@ public class MediaCodecSyncTest extends MediaCodecBase {
             if(!videoIsSeeking&&((presentationTimeUs / 1000) - seekVideoNormalTimeUs + outOfVideoTimeThreshold < System.currentTimeMillis() - startVideoMs-pauseVideoDuringMs))
             {
                 Log.v(TAG, "video packet too late drop it ... ");
-                //releaseOutputBuffer(outputBufferIndex, false);
-                //return false;
+                releaseOutputBuffer(outputBufferIndex, false);
+                return false;
             }
             //限定seek的容错时间
             if (videoIsSeeking && Math.abs(presentationTimeUs / 1000 - seekVideoNormalTimeUs) < 100)
@@ -502,7 +502,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
         //进行a/v sync
         private boolean sleepAudioRender(MediaCodec mediaCodec, MediaCodec.BufferInfo bufferInfo, int outputBufferIndex) {
             //当时间比较多的时候，就开始等.....
-            //Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs / 1000+","+" tjy time is:"+(System.currentTimeMillis() - startMs)));
+            Log.i(TAG,String.valueOf(bufferInfo.presentationTimeUs / 1000+","+" tjy time is: sleepAudioRender"));
             //如果时间差播放时间30ms，开始丢帧
 /*            if(!audioIsSeeking&&((bufferInfo.presentationTimeUs / 1000) - seekAudioNormalTimeUs + outOfAudioTimeThreshold < System.currentTimeMillis() - startAudioMs))
             {
