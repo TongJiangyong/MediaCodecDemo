@@ -40,11 +40,12 @@ public:
     int start(JNIEnv *env);
     int stop(JNIEnv *env);
     int flush(JNIEnv *env);
-    int writeInputData(JNIEnv *env,size_t idx, const uint8_t *data, size_t size);
-    int dequeueInputBuffer(JNIEnv *env,int64_t timeoutUs);
-    int queueInputBuffer(JNIEnv *env,size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags);
-    int dequeueOutputBuffer(JNIEnv *env, AMediaCodecBufferInfo &info, int64_t timeoutUs);
-    int releaseOutputBuffer(JNIEnv *env,size_t idx, bool render);
+    int fillInputBufferByIndex(JNIEnv *env,size_t idx, const uint8_t *data, size_t size);
+    int getOutputBufferByIndex(JNIEnv *env,size_t idx, uint8_t *data, size_t size);
+    int dequeueInputBufferIndex(JNIEnv *env,int64_t timeoutUs);
+    int queueInputBufferByIndex(JNIEnv *env,size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags);
+    int dequeueOutputBufferIndex(JNIEnv *env, AMediaCodecBufferInfo &info, int64_t timeoutUs);
+    int releaseOutputBufferByIndex(JNIEnv *env,size_t idx, bool render);
     int release(JNIEnv *env);
 
 private:

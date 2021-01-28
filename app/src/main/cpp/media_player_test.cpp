@@ -86,7 +86,7 @@ JNIEXPORT int JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueInputBuffer)(JNIEnv *env,
         XLOGD("dequeueInputBuffer error codec_ is null");
         return -1;
     }
-    int index = codec_->dequeueInputBuffer(env,timeoutUs);
+    int index = codec_->dequeueInputBufferIndex(env,timeoutUs);
     XLOGD("dequeueInputBuffer index:%d",index);
     return index;
 }
@@ -98,8 +98,8 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(queueInputBuffer)(JNIEnv *env, 
         return;
     }
     void *direct_video_buffer = env->GetDirectBufferAddress(inputBuffer);
-    codec_->writeInputData(env,index, (const uint8_t *)direct_video_buffer, size);
-    codec_->queueInputBuffer(env,index,offset,size,presentationTimeUs,flags);
+    codec_->fillInputBufferByIndex(env,index, (const uint8_t *)direct_video_buffer, size);
+    codec_->queueInputBufferByIndex(env,index,offset,size,presentationTimeUs,flags);
     return;
 }
 
@@ -112,7 +112,7 @@ JNIEXPORT jlongArray  JNICALL MEDIACODEC_JAVA_INTERFACE(dequeueOutputBuffer)(JNI
         return nullptr;
     }
     AMediaCodecBufferInfo info;
-    int index = codec_->dequeueOutputBuffer(env,info,timeoutUs);
+    int index = codec_->dequeueOutputBufferIndex(env,info,timeoutUs);
     jlongp[0] = index;
     jlongp[1] = info.presentationTimeUs;
     env->ReleaseLongArrayElements(jlongarray, jlongp, 0);
@@ -126,7 +126,7 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(releaseOutputBuffer)(JNIEnv *en
         XLOGD("releaseOutputBuffer error codec_ is null");
         return;
     }
-    codec_->releaseOutputBuffer(env,index,render);
+    codec_->releaseOutputBufferByIndex(env,index,render);
     return;
 }
 
@@ -145,7 +145,6 @@ jint JNIEXPORT JNICALL JNI_OnLoad(JavaVM* jvm, void* reserved) {
         J4A_loadClass__J4AC_java_nio_ByteBuffer(jni_env);
         J4A_loadClass__J4AC_java_util_ArrayList(jni_env);
         J4A_loadClass__J4AC_android_media_MediaFormat(jni_env);
-        J4A_loadClass__J4AC_android_media_PlaybackParams(jni_env);
     }
     return JNI_VERSION_1_4;
 }

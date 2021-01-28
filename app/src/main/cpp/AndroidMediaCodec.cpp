@@ -143,7 +143,7 @@ int AndroidMediaCodec::flush(JNIEnv *env)
     return AMEDIACODEC__OK;
 }
 
-int AndroidMediaCodec::writeInputData(JNIEnv *env,size_t idx, const uint8_t *data, size_t size)
+int AndroidMediaCodec::fillInputBufferByIndex(JNIEnv *env,size_t idx, const uint8_t *data, size_t size)
 {
     // XLOGD("%s", __func__);
     ssize_t write_ret = -1;
@@ -184,7 +184,7 @@ int AndroidMediaCodec::writeInputData(JNIEnv *env,size_t idx, const uint8_t *dat
     return write_ret;
 }
 
-int  AndroidMediaCodec::dequeueInputBuffer(JNIEnv *env,int64_t timeoutUs)
+int  AndroidMediaCodec::dequeueInputBufferIndex(JNIEnv *env,int64_t timeoutUs)
 {
     // XLOGD("%s(%d)", __func__, (int)timeoutUs);
 
@@ -211,7 +211,48 @@ int  AndroidMediaCodec::dequeueInputBuffer(JNIEnv *env,int64_t timeoutUs)
     return idx;
 }
 
-int  AndroidMediaCodec::queueInputBuffer(JNIEnv *env,size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags)
+int AndroidMediaCodec::getOutputBufferByIndex(JNIEnv *env,size_t idx, uint8_t *data, size_t size)
+{
+    // XLOGD("%s", __func__);
+    ssize_t write_ret = -1;
+    jobject output_buffer_array = nullptr;
+    jobject output_buffer = nullptr;
+
+    if(!checkJNIEnv(env)) {
+        return AMEDIACODEC__ENV_ERROR;
+    }
+
+    output_buffer_array = J4AC_MediaCodec__getOutputBuffers__catchAll(env, android_mediacodec_);
+    if (!output_buffer_array)
+        return AMEDIACODEC__BYTE_ARRAY_ERROR;
+
+    int buffer_count = env->GetArrayLength((jobjectArray)output_buffer_array);
+    if (J4A_ExceptionCheck__catchAll(env) || idx < 0 || idx >= buffer_count) {
+        XLOGE("%s: idx(%d) < count(%d)\n", __func__, (int)idx, (int)buffer_count);
+        goto fail;
+    }
+
+    output_buffer = env->GetObjectArrayElement((jobjectArray)output_buffer_array, idx);
+    if (J4A_ExceptionCheck__catchAll(env) || !output_buffer) {
+        XLOGE("%s: GetObjectArrayElement failed\n", __func__);
+        goto fail;
+    }
+
+    {
+        jlong buf_size = env->GetDirectBufferCapacity(output_buffer);
+        void *buf_ptr  = env->GetDirectBufferAddress(output_buffer);
+
+        write_ret = size < buf_size ? size : buf_size;
+        memcpy(data, buf_ptr, write_ret);
+    }
+
+    fail:
+    JNI_DeleteLocalRefP(env, &output_buffer);
+    JNI_DeleteLocalRefP(env, &output_buffer_array);
+    return write_ret;
+}
+
+int  AndroidMediaCodec::queueInputBufferByIndex(JNIEnv *env,size_t idx, off_t offset, size_t size, uint64_t time, uint32_t flags)
 {
     // XLOGD("%s: %d", __func__, (int)idx);
 
@@ -227,7 +268,7 @@ int  AndroidMediaCodec::queueInputBuffer(JNIEnv *env,size_t idx, off_t offset, s
     return AMEDIACODEC__OK;
 }
 
-int AndroidMediaCodec::dequeueOutputBuffer(JNIEnv *env,AMediaCodecBufferInfo &info,int64_t timeoutUs)
+int AndroidMediaCodec::dequeueOutputBufferIndex(JNIEnv *env,AMediaCodecBufferInfo &info,int64_t timeoutUs)
 {
     // XLOGD("%s(%d)", __func__, (int)timeoutUs);
 
@@ -266,7 +307,7 @@ int AndroidMediaCodec::dequeueOutputBuffer(JNIEnv *env,AMediaCodecBufferInfo &in
     return idx;
 }
 
-int AndroidMediaCodec::releaseOutputBuffer(JNIEnv *env,size_t idx, bool render)
+int AndroidMediaCodec::releaseOutputBufferByIndex(JNIEnv *env,size_t idx, bool render)
 {
     // XLOGD("%s", __func__);
 

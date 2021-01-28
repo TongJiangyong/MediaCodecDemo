@@ -40,6 +40,7 @@ typedef struct J4AC_android_media_MediaCodec {
     jmethodID method_configure;
     jmethodID method_getOutputFormat;
     jmethodID method_getInputBuffers;
+    jmethodID method_getOutputBuffers;
     jmethodID method_dequeueInputBuffer;
     jmethodID method_queueInputBuffer;
     jmethodID method_dequeueOutputBuffer;
@@ -489,9 +490,24 @@ jobjectArray J4AC_android_media_MediaCodec__getInputBuffers(JNIEnv *env, jobject
     return (*env)->CallObjectMethod(env, thiz, class_J4AC_android_media_MediaCodec.method_getInputBuffers);
 }
 
+jobjectArray J4AC_android_media_MediaCodec__getOutputBuffers(JNIEnv *env, jobject thiz)
+{
+    return (*env)->CallObjectMethod(env, thiz, class_J4AC_android_media_MediaCodec.method_getOutputBuffers);
+}
+
 jobjectArray J4AC_android_media_MediaCodec__getInputBuffers__catchAll(JNIEnv *env, jobject thiz)
 {
     jobjectArray ret_object = J4AC_android_media_MediaCodec__getInputBuffers(env, thiz);
+    if (J4A_ExceptionCheck__catchAll(env) || !ret_object) {
+        return NULL;
+    }
+
+    return ret_object;
+}
+
+jobjectArray J4AC_android_media_MediaCodec__getOutputBuffers__catchAll(JNIEnv *env, jobject thiz)
+{
+    jobjectArray ret_object = J4AC_android_media_MediaCodec__getOutputBuffers(env, thiz);
     if (J4A_ExceptionCheck__catchAll(env) || !ret_object) {
         return NULL;
     }
@@ -515,6 +531,26 @@ jobjectArray J4AC_android_media_MediaCodec__getInputBuffers__asGlobalRef__catchA
     }
 
 fail:
+    J4A_DeleteLocalRef__p(env, &local_object);
+    return ret_object;
+}
+
+jobjectArray J4AC_android_media_MediaCodec__getOutputBuffers__asGlobalRef__catchAll(JNIEnv *env, jobject thiz)
+{
+    jobjectArray ret_object   = NULL;
+    jobjectArray local_object = J4AC_android_media_MediaCodec__getOutputBuffers__catchAll(env, thiz);
+    if (J4A_ExceptionCheck__catchAll(env) || !local_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    ret_object = J4A_NewGlobalRef__catchAll(env, local_object);
+    if (!ret_object) {
+        ret_object = NULL;
+        goto fail;
+    }
+
+    fail:
     J4A_DeleteLocalRef__p(env, &local_object);
     return ret_object;
 }
@@ -676,6 +712,13 @@ int J4A_loadClass__J4AC_android_media_MediaCodec(JNIEnv *env)
     sign     = "()[Ljava/nio/ByteBuffer;";
     class_J4AC_android_media_MediaCodec.method_getInputBuffers = J4A_GetMethodID__catchAll(env, class_id, name, sign);
     if (class_J4AC_android_media_MediaCodec.method_getInputBuffers == NULL)
+        goto fail;
+
+    class_id = class_J4AC_android_media_MediaCodec.id;
+    name     = "getOutputBuffers";
+    sign     = "()[Ljava/nio/ByteBuffer;";
+    class_J4AC_android_media_MediaCodec.method_getOutputBuffers = J4A_GetMethodID__catchAll(env, class_id, name, sign);
+    if (class_J4AC_android_media_MediaCodec.method_getOutputBuffers == NULL)
         goto fail;
 
     class_id = class_J4AC_android_media_MediaCodec.id;

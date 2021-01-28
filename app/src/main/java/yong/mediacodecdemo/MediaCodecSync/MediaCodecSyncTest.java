@@ -73,7 +73,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
         videoThread =null;
         //停止音频
         audioThread.setAudioPlayStatus(false);
-        videoThread.cleanVideoMediaCodec();
+        audioThread.cleanAudioMediaCodec();
         audioThread =null;
     }
 

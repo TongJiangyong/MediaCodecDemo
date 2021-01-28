@@ -3,6 +3,5 @@
 #include "../java/util/ArrayList.h"
 #include "../media/include/MediaCodec.h"
 #include "../media/include/MediaFormat.h"
-#include "../media/include/PlaybackParams.h"
 #include "../java/os/Build.h"
 #include "../java/os/Bundle.h"

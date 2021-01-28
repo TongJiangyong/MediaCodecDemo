@@ -35,7 +35,6 @@ message("COMMON_PATH ${COMMON_PATH}")
 set(SOURCES
 	${SRC_PATH}/MediaCodec.c
 	${SRC_PATH}/MediaFormat.c
-	${SRC_PATH}/PlaybackParams.c
 	${SRC_J4A_PATH}/j4a_allclasses.c
 	${SRC_J4A_PATH}/j4a_base.c
 	${SRC_NIO_PATH}/ByteBuffer.c
