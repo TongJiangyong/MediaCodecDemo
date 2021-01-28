@@ -57,12 +57,12 @@ public class MediaCodecSyncTest extends MediaCodecBase {
         audioThread.initAudioExtractor();
         audioThread.initAudioCodec();
         //初始化视频相关
-//        videoThread = new VideoThread(true);
-//        videoThread.initVideoExtractor();
-//        videoThread.initVideoCodec();
+        videoThread = new VideoThread(true);
+        videoThread.initVideoExtractor();
+        videoThread.initVideoCodec();
         //启动线程
         new Thread(audioThread).start();
-        //new Thread(videoThread).start();
+        new Thread(videoThread).start();
     }
 
     //停止播放
