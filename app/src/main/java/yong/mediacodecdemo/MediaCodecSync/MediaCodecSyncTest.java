@@ -4,6 +4,7 @@ import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaCrypto;
 import android.media.MediaExtractor;
@@ -99,6 +100,7 @@ public class MediaCodecSyncTest extends MediaCodecBase {
         }
     }
     public native void createDecoderByType(String type);
+    public native void createByCodecName(String type);
     public native void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags);
     public native void startCodec();
     public native void stopCodec();
@@ -126,6 +128,26 @@ public class MediaCodecSyncTest extends MediaCodecBase {
             inputBuffer.clear();
         }
         return isMediaEOS;
+    }
+
+
+    private static MediaCodecInfo selectCodec(String mimeType) {
+        int numCodecs = MediaCodecList.getCodecCount();
+        for (int i = 0; i < numCodecs; i++) {
+            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
+
+            if (codecInfo.isEncoder()) {
+                continue;
+            }
+
+            String[] types = codecInfo.getSupportedTypes();
+            for (int j = 0; j < types.length; j++) {
+                if (types[j].equalsIgnoreCase(mimeType)) {
+                    return codecInfo;
+                }
+            }
+        }
+        return null;
     }
 
     //MeidaCodec的video线程.....
@@ -180,8 +202,9 @@ public class MediaCodecSyncTest extends MediaCodecBase {
                 mVideoExtractor.selectTrack(videoTrackIndex);
                 try {
                     MediaCodecList codecList = new MediaCodecList(ALL_CODECS);
-                    String test = codecList.findDecoderForFormat(mediaFormat);
-                    createDecoderByType(mediaFormat.getString(MediaFormat.KEY_MIME));
+                    String test = selectCodec(mediaFormat.getString(MediaFormat.KEY_MIME)).getName();
+                    //createDecoderByType(mediaFormat.getString(MediaFormat.KEY_MIME));
+                    createByCodecName(test);
                     configure(mediaFormat,playerSurface, null, 0);
                 } catch (Exception e) {
                     e.printStackTrace();

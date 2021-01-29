@@ -36,6 +36,19 @@ JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(createDecoderByType)(JNIEnv *en
     return;
 }
 
+JNIEXPORT void JNICALL MEDIACODEC_JAVA_INTERFACE(createByCodecName)(JNIEnv *env, jobject instance, jstring name) {
+
+    if (!codec_) {
+        codec_ = new AndroidMediaCodec();
+    }
+    const char *name_string = nullptr;
+    name_string = env->GetStringUTFChars(name, 0);
+    XLOGD("createByCodecName %s",name_string);
+    codec_->createByCodecName(env,name_string);
+    env->ReleaseStringUTFChars(name, name_string);
+    return;
+}
+
 JNIEXPORT void JNICALL Java_yong_mediacodecdemo_MainActivity_testA(JNIEnv *env, jobject instance) {
     XLOGD("testA");
 }
